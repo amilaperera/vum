@@ -1,0 +1,4 @@
+VUM (Vim bUndle Manager)
+========================
+VUM provides an easy way to manage your vim plugins in bundle directory.
+It allows the user to install, update and delete vim plugins in an easy interactive manner.
