@@ -5,21 +5,40 @@
 
 require 'rubygems'
 require 'colorize'
+require 'fileutils'
 
 class Vum
   VUM_REPOS_FILE = ENV["HOME"] + "/.vum_repos"
-  VUM_MAIN_MENU_INSTALL_WITHOUT_CHECK = 1
-  VUM_MAIN_MENU_INSTALL_WITH_CHECK = 2
-  VUM_MAIN_MENU_CHECK = 3
+  VUM_MAIN_MENU_CHANGE_PLUGIN_INSTALL_DIR = 1
+  VUM_MAIN_MENU_INSTALL_WITHOUT_CHECK = 2
+  VUM_MAIN_MENU_INSTALL_WITH_CHECK = 3
+  VUM_MAIN_MENU_CHECK = 4
+  VUM_MAIN_MENU_UPDATE = 5
+
+  @@plugins_dir = ENV["HOME"] + "/.vim/bundle"
 
   attr_reader :repolist, :ok_repolist, :failed_repolist, :download_ok_count, :download_failed_count
 
   def initialize
+    setup
+  end
+
+  def setup
     @repolist = get_repolist_from_file # if success repolist hash is sorted by plugin name
     @ok_repolist = []
     @failed_repolist = []
     @download_ok_count = 0
     @download_failed_count = 0
+  end
+
+  # accessor for @@plugins_dir
+  def self.plugins_dir
+    @@plugins_dir
+  end
+
+  # mutator for @@plugins_dir
+  def self.plugins_dir=(val)
+    @@plugins_dir = val
   end
 
   def get_repolist_from_file
@@ -51,8 +70,8 @@ class Vum
           " and vum will not use those repositories for downloading" if @failed_repolist.length > 0
 
     print "Proceed [y/n] ? "
-    answer = gets.chomp
-    return unless answer.downcase == "y" || answer.downcase == "yes"
+    answer = gets.chomp.downcase
+    return unless answer == "y" || answer == "yes"
 
     download_plugins
   end
@@ -110,6 +129,9 @@ class Vum
     end
   end
 
+  def get_updatable_plugin_list
+  end
+
   def get_plugin_name(line)
     line.gsub(/.*\//, "").gsub(/\..*$/, "").capitalize
   end
@@ -133,36 +155,61 @@ class Vum
     puts "  VUM (Vim bUndle Manager)"
     puts "  ========================"
     puts
+    puts "  " + "#{VUM_MAIN_MENU_CHANGE_PLUGIN_INSTALL_DIR}" + ". Change plugins directory [ default: #{File.expand_path(@@plugins_dir)} ]"
     puts "  " + "#{VUM_MAIN_MENU_INSTALL_WITHOUT_CHECK}" + ". Install plugins (without checking for repositories)"
     puts "  " + "#{VUM_MAIN_MENU_INSTALL_WITH_CHECK}" + ". Install plugins after repository check"
     puts "  " + "#{VUM_MAIN_MENU_CHECK}" + ". Check for repositories"
+    puts "  " + "#{VUM_MAIN_MENU_UPDATE}" + ". Update plugins"
     puts "  " + "q" + ". Quit"
     puts
-    print "  Choice ? "
-    gets.chomp
+    show_prompt
   end
 
   def self.show_prompt
     print "  Choice ? "
-    gets.chomp
+    gets.chomp.downcase
   end
 
 end
 
 # main
-input = Vum.show_vum_main_menu_with_prompt
-
 vum = Vum.new
 
 begin
-  is_good_choice = true
-  exit if input == "q" || input == "Q"
+  input = Vum.show_vum_main_menu_with_prompt
+  exit if input == "q"
+
+  Dir.chdir(File.expand_path(Vum.plugins_dir))
 
   case input.to_i
+  when Vum::VUM_MAIN_MENU_CHANGE_PLUGIN_INSTALL_DIR
+    puts
+    print "Enter new plugins directory : "
+    new_directory = gets.chomp
+
+    if File.directory?(new_directory)
+      Vum.plugins_dir = new_directory
+    else
+      puts "Directory(#{new_directory}) doesn't exist"
+      print "Do you want to create a new directory [y/n] ? "
+      chdir_answer = gets.chomp.downcase
+      if chdir_answer == 'y' || chdir_answer == 'yes'
+        begin
+          FileUtils.mkdir_p(new_directory)
+          Vum.plugins_dir = new_directory
+        rescue
+          puts "Directory(#{new_directory}) creation failed"
+          puts "Check if you have permissions to create the directory"
+        end
+      end
+    end
+
   when Vum::VUM_MAIN_MENU_INSTALL_WITHOUT_CHECK
     puts
     puts "Install plugins without checking for repository existence"
     puts "========================================================="
+    puts
+    puts "Entering #{Vum.plugins_dir}"
     vum.install_plugins_without_check
     puts
     puts "  #{vum.download_ok_count}/#{vum.repolist.length} plugins were downloaded successfully" if vum.download_ok_count > 0
@@ -173,6 +220,8 @@ begin
     puts
     puts "Install plugins after checking for repository existence"
     puts "======================================================="
+    puts
+    puts "Entering #{Vum.plugins_dir}"
     vum.install_plugins_with_check
     puts
     puts "  #{vum.download_ok_count}/#{vum.repolist.length} plugins were downloaded successfully" if vum.download_ok_count > 0
@@ -185,10 +234,14 @@ begin
     puts "================================="
     vum.check_for_repo_existence
 
-  else
-    is_good_choice = false
+  when Vum::VUM_MAIN_MENU_UPDATE
+    puts
+    puts "Retrieving existing updatable plugin list..."
 
+  else
     puts "  Wrong choice..."
-    input = Vum.show_prompt
   end
-end while not is_good_choice
+
+  vum.setup
+
+end while true
