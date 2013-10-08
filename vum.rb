@@ -26,7 +26,7 @@ class Vum
 
   def setup
     @repolist = get_repolist_from_file # this is an array of hashes { :repo_site :plugin_name }
-    @existing_plugins = [] # current updatable plugins in bundle directory
+    @existing_plugins = [] # current updatable plugins in bundle directory { :plugin_name, :repo_site, :dir }
     @ok_repolist = []
     @failed_repolist = []
     @download_ok_count = 0
@@ -139,12 +139,26 @@ class Vum
   def get_updatable_plugin_list
     Dir.glob(File.expand_path(Vum.plugins_dir) + "/*").each do |dir|
       Dir.chdir(dir)
-      repo_line = `git remote -v | grep -e "fetch)$" | tr '\t' ' ' | cut -d " " -f 2`
-      @existing_plugins << { :dir => dir, :plugin_name => get_plugin_name(repo_line), :repo_site => get_repo_site(repo_line) }
+      if Dir.exists?(".git")
+        repo_line = `git remote -v | grep -e "fetch)$" | tr '\t' ' ' | cut -d " " -f 2`
+        @existing_plugins << { :dir => dir, :plugin_name => get_plugin_name(repo_line), :repo_site => get_repo_site(repo_line) }
+      end
     end
+
     unless @existing_plugins.empty?
       @existing_plugins = @existing_plugins.sort_by { |plugin| plugin[:plugin_name] }
-      @existing_plugins.each_with_index { |plugin, index| puts "  #{index + 1}".bold.yellow + ". #{plugin[:plugin_name]}" }
+      max_length_plugin_name = @existing_plugins.max_by { |plugin| plugin[:plugin_name].length }
+
+      @existing_plugins.each_with_index do |plugin, index|
+        if (index + 1) % 2 != 0
+          padding_length = max_length_plugin_name[:plugin_name].length - plugin[:plugin_name].length + 6 -
+            (index + 1).to_s.length
+          print "  #{index + 1}".bold.yellow + ". #{plugin[:plugin_name]}" + " " * padding_length
+        else
+          puts "  #{index + 1}".bold.yellow + ". #{plugin[:plugin_name]}"
+        end
+      end
+
     else
       puts "  There are no updatable plugins in the bundle directory"
     end
