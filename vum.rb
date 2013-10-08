@@ -25,6 +25,7 @@ class Vum
 
   def setup
     @repolist = get_repolist_from_file # this is an array of hashes { :repo_site :plugin_name }
+    @existing_plugins_in_dir = [] # current updatable plugins in bundle directory
     @ok_repolist = []
     @failed_repolist = []
     @download_ok_count = 0
@@ -135,16 +136,20 @@ class Vum
   end
 
   def get_updatable_plugin_list
-    plugin_array = @repolist.collect { |repo| repo[:plugin_name] }
-    max_plugin_name = plugin_array.max_by { |plugin| plugin.length }
+    fetch_repo, plugins = [], []
 
-    @repolist.each_with_index do |repo, index|
-      padding_length = max_plugin_name.length - (index + 1).to_s.length + 5 - repo[:plugin_name].length
-      if (index + 1) % 2 == 1
-        print "  #{index + 1}".bold.yellow + ". #{repo[:plugin_name]}" + " " * padding_length
-      else
-        puts "#{index + 1}".bold.yellow + ". #{repo[:plugin_name]}"
-      end
+    Dir.glob(File.expand_path(Vum.plugins_dir) + "/*").each do |dir|
+      Dir.chdir(dir)
+      fetch_repo << `git remote -v | grep -e "fetch)$" | tr '\t' ' ' | cut -d " " -f 2`
+    end
+    fetch_repo.each do |repo|
+      plugins << get_plugin_name(repo)
+    end
+
+    unless plugins.empty?
+      plugins.collect { |plugin| plugin.strip }
+      plugins = plugins.sort_by { |plugin| plugin }
+      plugins.each_with_index { |plugin, index| puts "  #{index + 1}".bold.yellow + ". #{plugin}" }
     end
   end
 
@@ -276,7 +281,18 @@ begin
     print "  Enter choice : "
     choice = gets.chomp.downcase
 
-    unless choice == 'q'
+    while true
+      break if choice == 'q'
+      if choice.to_s == 'a'
+        # update all the plugins
+      elsif (choice.to_i > 0 and choice.to_i < choice.count + 1)
+        # update a specific plugin
+      else
+        puts "  Wrong choice..."
+        puts
+        print "  Enter choice : "
+        choice = gets.chomp.downcase
+      end
     end
 
   else
