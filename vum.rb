@@ -24,7 +24,7 @@ class Vum
   end
 
   def setup
-    @repolist = get_repolist_from_file # if success repolist hash is sorted by plugin name
+    @repolist = get_repolist_from_file # this is an array of hashes { :repo_site :plugin_name }
     @ok_repolist = []
     @failed_repolist = []
     @download_ok_count = 0
@@ -88,7 +88,8 @@ class Vum
     # get maximum reposite name
     max_repo_plugin_site_name_length = get_max_repo_line_length(@repolist)
     @repolist.each do |repo|
-      padding_length = max_repo_plugin_site_name_length + 4 - repo[:repo_site].length - repo[:plugin_name].length
+      padding_length = max_repo_plugin_site_name_length + 4 -
+        repo[:repo_site].length - repo[:plugin_name].length
 
       `git ls-remote #{repo[:repo_site]} 2>/dev/null 1>&2`
       if $?.exitstatus == 0
@@ -112,24 +113,39 @@ class Vum
 
     @ok_repolist.each_with_index do |repo, index|
 
-      padding_length = max_repo_plugin_site_name_length - (index + 1).to_s.length + 4 - repo[:repo_site].length - repo[:plugin_name].length
+      padding_length = max_repo_plugin_site_name_length - (index + 1).to_s.length + 4 -
+        repo[:repo_site].length - repo[:plugin_name].length
 
       `git clone #{repo[:repo_site]} 2>/dev/null 1>&2`
       if $?.exitstatus == 0
-        print "(#{index + 1}/#{@ok_repolist.length}) Downloading " + "#{repo[:plugin_name]}".bold.green +
-          " from #{repo[:repo_site]} " + "." * padding_length
+        print "(#{index + 1}/#{@ok_repolist.length}) Downloading " +
+          "#{repo[:plugin_name]}".bold.green + " from #{repo[:repo_site]} " +
+          "." * padding_length
         puts " [   " + "OK".bold.green + "   ]"
+
         @download_ok_count += 1
       else
-        print "(#{index + 1}/#{@ok_repolist.length}) Downloading " + "#{repo[:plugin_name]}".bold.red +
-          " from #{repo[:repo_site]} " + "." * padding_length
+        print "(#{index + 1}/#{@ok_repolist.length}) Downloading " +
+          "#{repo[:plugin_name]}".bold.red + " from #{repo[:repo_site]} " + "." * padding_length
         puts " [ " + "FAILED".bold.red + " ]"
+
         @download_failed_count += 1
       end
     end
   end
 
   def get_updatable_plugin_list
+    plugin_array = @repolist.collect { |repo| repo[:plugin_name] }
+    max_plugin_name = plugin_array.max_by { |plugin| plugin.length }
+
+    @repolist.each_with_index do |repo, index|
+      padding_length = max_plugin_name.length - (index + 1).to_s.length + 5 - repo[:plugin_name].length
+      if (index + 1) % 2 == 1
+        print "  #{index + 1}".bold.yellow + ". #{repo[:plugin_name]}" + " " * padding_length
+      else
+        puts "#{index + 1}".bold.yellow + ". #{repo[:plugin_name]}"
+      end
+    end
   end
 
   def get_plugin_name(line)
@@ -155,12 +171,15 @@ class Vum
     puts "  VUM (Vim bUndle Manager)"
     puts "  ========================"
     puts
-    puts "  " + "#{VUM_MAIN_MENU_CHANGE_PLUGIN_INSTALL_DIR}" + ". Change plugins directory [ default: #{File.expand_path(@@plugins_dir)} ]"
-    puts "  " + "#{VUM_MAIN_MENU_INSTALL_WITHOUT_CHECK}" + ". Install plugins (without checking for repositories)"
-    puts "  " + "#{VUM_MAIN_MENU_INSTALL_WITH_CHECK}" + ". Install plugins after repository check"
-    puts "  " + "#{VUM_MAIN_MENU_CHECK}" + ". Check for repositories"
-    puts "  " + "#{VUM_MAIN_MENU_UPDATE}" + ". Update plugins"
-    puts "  " + "q" + ". Quit"
+    puts "  " + "#{VUM_MAIN_MENU_CHANGE_PLUGIN_INSTALL_DIR}".bold.yellow +
+      ". Change plugins directory [ default: #{File.expand_path(@@plugins_dir)} ]"
+    puts "  " + "#{VUM_MAIN_MENU_INSTALL_WITHOUT_CHECK}".bold.yellow +
+      ". Install plugins (without checking for repositories)"
+    puts "  " + "#{VUM_MAIN_MENU_INSTALL_WITH_CHECK}".bold.yellow +
+      ". Install plugins after repository check"
+    puts "  " + "#{VUM_MAIN_MENU_CHECK}".bold.yellow + ". Check for repositories"
+    puts "  " + "#{VUM_MAIN_MENU_UPDATE}".bold.yellow + ". Update plugins"
+    puts "  " + "q".bold.yellow + ". Quit"
     puts
     show_prompt
   end
@@ -212,8 +231,13 @@ begin
     puts "Entering #{Vum.plugins_dir}"
     vum.install_plugins_without_check
     puts
-    puts "  #{vum.download_ok_count}/#{vum.repolist.length} plugins were downloaded successfully" if vum.download_ok_count > 0
-    puts "  #{vum.download_failed_count}/#{vum.repolist.length} plugins failed during downloading for some reason" if vum.download_failed_count > 0
+    if vum.download_ok_count > 0
+      puts "  #{vum.download_ok_count}/#{vum.repolist.length} plugins were downloaded successfully"
+    end
+    if vum.download_failed_count > 0
+      puts "  #{vum.download_failed_count}/#{vum.repolist.length} plugins " +
+        "failed during downloading for some reason"
+    end
     puts
 
   when Vum::VUM_MAIN_MENU_INSTALL_WITH_CHECK
@@ -224,8 +248,13 @@ begin
     puts "Entering #{Vum.plugins_dir}"
     vum.install_plugins_with_check
     puts
-    puts "  #{vum.download_ok_count}/#{vum.repolist.length} plugins were downloaded successfully" if vum.download_ok_count > 0
-    puts "  #{vum.download_failed_count}/#{vum.repolist.length} plugins failed during downloading for some reason" if vum.download_failed_count > 0
+    if vum.download_ok_count > 0
+      puts "  #{vum.download_ok_count}/#{vum.repolist.length} plugins were downloaded successfully"
+    end
+    if vum.download_failed_count > 0
+      puts "  #{vum.download_failed_count}/#{vum.repolist.length}" +
+      " plugins failed during downloading for some reason"
+    end
     puts
 
   when Vum::VUM_MAIN_MENU_CHECK
@@ -236,7 +265,19 @@ begin
 
   when Vum::VUM_MAIN_MENU_UPDATE
     puts
+    puts "Entering #{Vum.plugins_dir}"
     puts "Retrieving existing updatable plugin list..."
+    puts
+    vum.get_updatable_plugin_list
+    puts
+    puts "  A".bold.yellow + ".  All"
+    puts "  q".bold.yellow + ".  Quit"
+    puts
+    print "  Enter choice : "
+    choice = gets.chomp.downcase
+
+    unless choice == 'q'
+    end
 
   else
     puts "  Wrong choice..."
