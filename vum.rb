@@ -8,6 +8,9 @@ require 'colorize'
 require 'fileutils'
 
 class Vum
+  attr_reader :repolist, :ok_repolist, :failed_repolist, :download_ok_count, :download_failed_count
+  attr_accessor :existing_plugins
+
   VUM_REPOS_FILE = ENV["HOME"] + "/.vum_repos"
   VUM_MAIN_MENU_CHANGE_PLUGIN_INSTALL_DIR = 1
   VUM_MAIN_MENU_INSTALL_WITHOUT_CHECK = 2
@@ -17,15 +20,13 @@ class Vum
 
   @@plugins_dir = ENV["HOME"] + "/.vim/bundle"
 
-  attr_reader :repolist, :ok_repolist, :failed_repolist, :download_ok_count, :download_failed_count
-
   def initialize
     setup
   end
 
   def setup
     @repolist = get_repolist_from_file # this is an array of hashes { :repo_site :plugin_name }
-    @existing_plugins_in_dir = [] # current updatable plugins in bundle directory
+    @existing_plugins = [] # current updatable plugins in bundle directory
     @ok_repolist = []
     @failed_repolist = []
     @download_ok_count = 0
@@ -136,25 +137,27 @@ class Vum
   end
 
   def get_updatable_plugin_list
-    fetch_repo, plugins = [], []
-
     Dir.glob(File.expand_path(Vum.plugins_dir) + "/*").each do |dir|
       Dir.chdir(dir)
-      fetch_repo << `git remote -v | grep -e "fetch)$" | tr '\t' ' ' | cut -d " " -f 2`
+      repo_line = `git remote -v | grep -e "fetch)$" | tr '\t' ' ' | cut -d " " -f 2`
+      @existing_plugins << { :dir => dir, :plugin_name => get_plugin_name(repo_line), :repo_site => get_repo_site(repo_line) }
     end
-    fetch_repo.each do |repo|
-      plugins << get_plugin_name(repo)
+    unless @existing_plugins.empty?
+      @existing_plugins = @existing_plugins.sort_by { |plugin| plugin[:plugin_name] }
+      @existing_plugins.each_with_index { |plugin, index| puts "  #{index + 1}".bold.yellow + ". #{plugin[:plugin_name]}" }
+    else
+      puts "  There are no updatable plugins in the bundle directory"
     end
 
-    unless plugins.empty?
-      plugins.collect { |plugin| plugin.strip }
-      plugins = plugins.sort_by { |plugin| plugin }
-      plugins.each_with_index { |plugin, index| puts "  #{index + 1}".bold.yellow + ". #{plugin}" }
-    end
+    puts "\n  " + "A".bold.yellow + ". All" if @existing_plugins.count > 1
   end
 
   def get_plugin_name(line)
-    line.gsub(/.*\//, "").gsub(/\..*$/, "").capitalize
+    line.match(/.*\/(\S*)/)[1].to_s.strip.capitalize.gsub(/\..*/, "")
+  end
+
+  def get_repo_site(line)
+    line.match(/http\S*\s/).to_s.strip
   end
 
   def sort_repolist_by_plugin_name(repolist)
@@ -274,19 +277,29 @@ begin
     puts "Retrieving existing updatable plugin list..."
     puts
     vum.get_updatable_plugin_list
+    puts "  q".bold.yellow + ". Quit"
     puts
-    puts "  A".bold.yellow + ".  All"
-    puts "  q".bold.yellow + ".  Quit"
-    puts
-    print "  Enter choice : "
-    choice = gets.chomp.downcase
 
     while true
+      print "  Enter choice : "
+      choice = gets.chomp.downcase
       break if choice == 'q'
       if choice.to_s == 'a'
         # update all the plugins
-      elsif (choice.to_i > 0 and choice.to_i < choice.count + 1)
+      elsif choice.to_i > 0 and choice.to_i < ((vum.existing_plugins.count) + 1)
         # update a specific plugin
+        choice_no = choice.to_i
+        targetted_plugin = vum.existing_plugins[choice_no - 1]
+        dir, repo, plugin = targetted_plugin[:dir], targetted_plugin[:repo_site], targetted_plugin[:plugin_name]
+        Dir.chdir(dir)
+        puts "  Updating VIM plugin #{plugin} from #{repo}"
+        `git pull`
+        if $?.exitstatus == 0
+          puts "    #{plugin} updated successfully".bold.green
+        else
+          puts "    #{plugin} updating failed".bold.red
+        end
+        break
       else
         puts "  Wrong choice..."
         puts
