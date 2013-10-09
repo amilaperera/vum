@@ -8,7 +8,9 @@ require 'colorize'
 require 'fileutils'
 
 class Vum
-  attr_reader :repolist, :ok_repolist, :failed_repolist, :download_ok_count, :download_failed_count
+  attr_reader :repolist, :ok_repolist, :failed_repolist, :download_ok_count, :download_failed_count,
+    :skipped_plugin_count
+
   attr_accessor :existing_plugins
 
   VUM_REPOS_FILE = ENV["HOME"] + "/.vum_repos"
@@ -31,6 +33,7 @@ class Vum
     @failed_repolist = []
     @download_ok_count = 0
     @download_failed_count = 0
+    @skipped_plugin_count = 0
   end
 
   # accessor for @@plugins_dir
@@ -64,12 +67,12 @@ class Vum
     check_for_repo_existence
 
     puts
-    puts "#{@ok_repolist.length}/#{@repolist.length}" +
-          " repositories seem to be good enough for downloading" if @ok_repolist.length > 0
+    puts "  #{@ok_repolist.length}/#{@repolist.length}" +
+      " repositories seem to be good enough for downloading" if @ok_repolist.length > 0
 
-    puts "#{@failed_repolist.length}/#{@repolist.length}" +
-          " repositories were found to have some troubles" +
-          " and vum will not use those repositories for downloading" if @failed_repolist.length > 0
+    puts "  #{@failed_repolist.length}/#{@repolist.length}" +
+      " repositories were found to have some troubles" +
+      " and vum will not use those repositories for downloading" if @failed_repolist.length > 0
 
     print "Proceed [y/n] ? "
     answer = gets.chomp.downcase
@@ -96,12 +99,12 @@ class Vum
       `git ls-remote #{repo[:repo_site]} 2>/dev/null 1>&2`
       if $?.exitstatus == 0
         @ok_repolist << repo
-        puts "#{repo[:plugin_name]}".bold.green + "(#{repo[:repo_site]}) " +
-            ("." * padding_length) + " [   "+ "OK".bold.green + "   ]"
+        puts "  #{repo[:plugin_name]}".bold.green + "(#{repo[:repo_site]}) " +
+          ("." * padding_length) + " [   "+ "OK".bold.green + "   ]"
       else
         @failed_repolist << repo
-        puts "#{repo[:plugin_name]}".bold.red + "(#{repo[:repo_site]}) " +
-            ("." * padding_length) + " [ "+ "FAILED".bold.red + " ]"
+        puts "  #{repo[:plugin_name]}".bold.red + "(#{repo[:repo_site]}) " +
+          ("." * padding_length) + " [ "+ "FAILED".bold.red + " ]"
       end
     end
   end
@@ -115,25 +118,37 @@ class Vum
 
     @ok_repolist.each_with_index do |repo, index|
 
-      padding_length = max_repo_plugin_site_name_length - (index + 1).to_s.length + 4 -
+      padding_length = max_repo_plugin_site_name_length - (index + 1).to_s.length + 2 -
         repo[:repo_site].length - repo[:plugin_name].length
 
-      `git clone #{repo[:repo_site]} 2>/dev/null 1>&2`
-      if $?.exitstatus == 0
-        print "(#{index + 1}/#{@ok_repolist.length}) Downloading " +
-          "#{repo[:plugin_name]}".bold.green + " from #{repo[:repo_site]} " +
-          "." * padding_length
-        puts " [   " + "OK".bold.green + "   ]"
+      unless plugin_directory_exists?(repo)
+        `git clone #{repo[:repo_site]} 2>/dev/null 1>&2`
+        if $?.exitstatus == 0
+          print "  (#{index + 1}/#{@ok_repolist.length}) Downloading " +
+            "#{repo[:plugin_name]}".bold.green + " from #{repo[:repo_site]} " +
+            "." * padding_length
+          puts " [   " + "OK".bold.green + "   ]"
 
-        @download_ok_count += 1
-      else
-        print "(#{index + 1}/#{@ok_repolist.length}) Downloading " +
-          "#{repo[:plugin_name]}".bold.red + " from #{repo[:repo_site]} " + "." * padding_length
-        puts " [ " + "FAILED".bold.red + " ]"
+          @download_ok_count += 1
+        else
+          print "  (#{index + 1}/#{@ok_repolist.length}) Downloading " +
+            "#{repo[:plugin_name]}".bold.red + " from #{repo[:repo_site]} " + "." * padding_length
+          puts " [ " + "FAILED".bold.red + " ]"
 
-        @download_failed_count += 1
+          @download_failed_count += 1
+        end
       end
     end
+  end
+
+  def plugin_directory_exists?(repo)
+    dir = repo[:repo_site].match(/.*\/(\S*)/)[1].to_s.strip.gsub(/\.git/, "")
+    if Dir.exists?(dir)
+      puts "  Skip downloading #{repo[:plugin_name]} (already exists)...\n".bold.blue
+      @skipped_plugin_count += 1
+      return true
+    end
+    return false
   end
 
   def get_updatable_plugin_list
@@ -187,6 +202,19 @@ class Vum
       end
     end
     max_repo_plugin_site_name_length
+  end
+
+  def print_download_summary
+    if @download_ok_count > 0
+      puts "  #{@download_ok_count}/#{@repolist.length} plugins were downloaded successfully"
+    end
+    if @download_failed_count > 0
+      puts "  #{@download_failed_count}/#{@repolist.length} plugins " +
+        "failed during downloading for some reason"
+    end
+    if @skipped_plugin_count > 0
+      puts "  #{@skipped_plugin_count}/#{@repolist.length} plugins are already existing"
+    end
   end
 
   def self.show_vum_main_menu_with_prompt
@@ -272,14 +300,7 @@ begin
     puts "Entering #{Vum.plugins_dir}"
     vum.install_plugins_without_check
     puts
-    if vum.download_ok_count > 0
-      puts "  #{vum.download_ok_count}/#{vum.repolist.length} plugins were downloaded successfully"
-    end
-    if vum.download_failed_count > 0
-      puts "  #{vum.download_failed_count}/#{vum.repolist.length} plugins " +
-        "failed during downloading for some reason"
-    end
-    puts
+    vum.print_download_summary
 
   when Vum::VUM_MAIN_MENU_INSTALL_WITH_CHECK
     puts
@@ -289,14 +310,7 @@ begin
     puts "Entering #{Vum.plugins_dir}"
     vum.install_plugins_with_check
     puts
-    if vum.download_ok_count > 0
-      puts "  #{vum.download_ok_count}/#{vum.repolist.length} plugins were downloaded successfully"
-    end
-    if vum.download_failed_count > 0
-      puts "  #{vum.download_failed_count}/#{vum.repolist.length}" +
-      " plugins failed during downloading for some reason"
-    end
-    puts
+    vum.print_download_summary
 
   when Vum::VUM_MAIN_MENU_CHECK
     puts
