@@ -137,6 +137,7 @@ class Vum
   end
 
   def get_updatable_plugin_list
+    @existing_plugins = []
     Dir.glob(File.expand_path(Vum.plugins_dir) + "/*").each do |dir|
       Dir.chdir(dir)
       if Dir.exists?(".git")
@@ -307,18 +308,25 @@ begin
         dir, repo, plugin = targetted_plugin[:dir], targetted_plugin[:repo_site], targetted_plugin[:plugin_name]
         Dir.chdir(dir)
         puts "  Updating VIM plugin #{plugin} from #{repo}"
-        `git pull`
+        res_out = `git pull`
+
         if $?.exitstatus == 0
-          puts "    #{plugin} updated successfully".bold.green
+          if res_out.include?("up-to-date")
+            puts "    #{plugin} is up-to-date".white.bold
+          else
+            puts "    #{plugin} updated successfully".bold.green
+          end
         else
           puts "    #{plugin} updating failed".bold.red
         end
-        break
+        # show the updatable plugin list
+        puts
+        vum.get_updatable_plugin_list
+        puts "  q".bold.yellow + ". Quit"
+        puts
       else
         puts "  Wrong choice..."
         puts
-        print "  Enter choice : "
-        choice = gets.chomp.downcase
       end
     end
 
