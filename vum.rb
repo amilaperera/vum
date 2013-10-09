@@ -214,6 +214,7 @@ class Vum
 
 end
 
+# update a single plugin
 def update_plugin(plugin)
   dir, repo, p_n = plugin[:dir], plugin[:repo_site], plugin[:plugin_name]
   Dir.chdir(dir)
