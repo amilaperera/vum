@@ -73,7 +73,7 @@ class Vum
 
     print "Proceed [y/n] ? "
     answer = gets.chomp.downcase
-    return unless answer == "y" || answer == "yes"
+    return unless answer == "y" or answer == "yes"
 
     download_plugins
   end
@@ -202,7 +202,7 @@ class Vum
       ". Install plugins after repository check"
     puts "  " + "#{VUM_MAIN_MENU_CHECK}".bold.yellow + ". Check for repositories"
     puts "  " + "#{VUM_MAIN_MENU_UPDATE}".bold.yellow + ". Update plugins"
-    puts "  " + "q".bold.yellow + ". Quit"
+    puts "  " + "Q".bold.yellow + ". Quit"
     puts
     show_prompt
   end
@@ -214,12 +214,29 @@ class Vum
 
 end
 
+def update_plugin(plugin)
+  dir, repo, p_n = plugin[:dir], plugin[:repo_site], plugin[:plugin_name]
+  Dir.chdir(dir)
+  puts "  Updating vim plugin #{p_n} from #{repo}..."
+  res_out = `git pull`
+
+  if $?.exitstatus == 0
+    if res_out.include?("up-to-date")
+      puts "    #{p_n} is up-to-date".white.bold
+    else
+      puts "    #{p_n} updated successfully".bold.green
+    end
+  else
+    puts "    #{p_n} updating failed".bold.red
+  end
+end
+
 # main
 vum = Vum.new
 
 begin
   input = Vum.show_vum_main_menu_with_prompt
-  exit if input == "q"
+  exit if input == "q" or input == "quit"
 
   Dir.chdir(File.expand_path(Vum.plugins_dir))
 
@@ -235,7 +252,7 @@ begin
       puts "Directory(#{new_directory}) doesn't exist"
       print "Do you want to create a new directory [y/n] ? "
       chdir_answer = gets.chomp.downcase
-      if chdir_answer == 'y' || chdir_answer == 'yes'
+      if chdir_answer == 'y' or chdir_answer == 'yes'
         begin
           FileUtils.mkdir_p(new_directory)
           Vum.plugins_dir = new_directory
@@ -292,33 +309,30 @@ begin
     puts "Retrieving existing updatable plugin list..."
     puts
     vum.get_updatable_plugin_list
-    puts "  q".bold.yellow + ". Quit"
+    puts "  Q".bold.yellow + ". Quit"
     puts
 
     while true
       print "  Enter choice : "
       choice = gets.chomp.downcase
-      break if choice == 'q'
-      if choice.to_s == 'a'
+      break if choice == 'q' or choice == 'quit'
+      if choice.to_s == 'a' or choice.to_s == 'all'
+        puts "  Updating all the plugins"
+        puts
         # update all the plugins
+        vum.existing_plugins.each do |targetted_plugin|
+          update_plugin(targetted_plugin)
+          puts
+        end
+        puts
+        vum.get_updatable_plugin_list
+        puts "  q".bold.yellow + ". Quit"
+        puts
       elsif choice.to_i > 0 and choice.to_i < ((vum.existing_plugins.count) + 1)
         # update a specific plugin
         choice_no = choice.to_i
         targetted_plugin = vum.existing_plugins[choice_no - 1]
-        dir, repo, plugin = targetted_plugin[:dir], targetted_plugin[:repo_site], targetted_plugin[:plugin_name]
-        Dir.chdir(dir)
-        puts "  Updating VIM plugin #{plugin} from #{repo}"
-        res_out = `git pull`
-
-        if $?.exitstatus == 0
-          if res_out.include?("up-to-date")
-            puts "    #{plugin} is up-to-date".white.bold
-          else
-            puts "    #{plugin} updated successfully".bold.green
-          end
-        else
-          puts "    #{plugin} updating failed".bold.red
-        end
+        update_plugin(targetted_plugin)
         # show the updatable plugin list
         puts
         vum.get_updatable_plugin_list
