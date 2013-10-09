@@ -4,8 +4,29 @@
 # This downloads/updates/deletes vim plugins that are managed via git
 
 require 'rubygems'
-require 'colorize'
 require 'fileutils'
+
+# extending String class to display strings in color
+class String
+  def color(color_code); "\e[0;#{color_code}m#{self}\e[0m"; end
+  def bold_color(color_code); "\e[1;#{color_code}m#{self}\e[0m"; end
+  def underscore_color(color_code); "\e[4;#{color_code}m#{self}\e[0m"; end
+
+  def red; color(31); end
+  def green; color(32); end
+  def yellow; color(33); end
+  def blue; color(34); end
+
+  def bold_red; bold_color(31); end
+  def bold_green; bold_color(32); end
+  def bold_yellow; bold_color(33); end
+  def bold_blue; bold_color(34); end
+
+  def underscore_red; underscore_color(31); end
+  def underscore_green; underscore_color(32); end
+  def underscore_yellow; underscore_color(33); end
+  def underscore_blue; underscore_color(34); end
+end
 
 class Vum
   attr_reader :repolist, :ok_repolist, :failed_repolist, :download_ok_count, :download_failed_count,
@@ -99,12 +120,12 @@ class Vum
       `git ls-remote #{repo[:repo_site]} 2>/dev/null 1>&2`
       if $?.exitstatus == 0
         @ok_repolist << repo
-        puts "  #{repo[:plugin_name]}".bold.green + "(#{repo[:repo_site]}) " +
-          ("." * padding_length) + " [   "+ "OK".bold.green + "   ]"
+        puts "  #{repo[:plugin_name]}".bold_green + "(" + "#{repo[:repo_site]}".underscore_blue + ") " +
+          ("." * padding_length) + " [   "+ "OK".bold_green + "   ]"
       else
         @failed_repolist << repo
-        puts "  #{repo[:plugin_name]}".bold.red + "(#{repo[:repo_site]}) " +
-          ("." * padding_length) + " [ "+ "FAILED".bold.red + " ]"
+        puts "  #{repo[:plugin_name]}".bold_red + "(" + "#{repo[:repo_site]}".underscore_blue + ") " +
+          ("." * padding_length) + " [ "+ "FAILED".bold_red + " ]"
       end
     end
   end
@@ -121,19 +142,20 @@ class Vum
       padding_length = max_repo_plugin_site_name_length - (index + 1).to_s.length + 2 -
         repo[:repo_site].length - repo[:plugin_name].length
 
-      unless plugin_directory_exists?(repo)
+      unless plugin_directory_exists?(repo, index)
         `git clone #{repo[:repo_site]} 2>/dev/null 1>&2`
         if $?.exitstatus == 0
           print "  (#{index + 1}/#{@ok_repolist.length}) Downloading " +
-            "#{repo[:plugin_name]}".bold.green + " from #{repo[:repo_site]} " +
-            "." * padding_length
-          puts " [   " + "OK".bold.green + "   ]"
+            "#{repo[:plugin_name]}".bold_green + " from " + "#{repo[:repo_site]}".underscore_blue +
+            " " + "." * padding_length
+          puts " [   " + "OK".bold_green + "   ]"
 
           @download_ok_count += 1
         else
           print "  (#{index + 1}/#{@ok_repolist.length}) Downloading " +
-            "#{repo[:plugin_name]}".bold.red + " from #{repo[:repo_site]} " + "." * padding_length
-          puts " [ " + "FAILED".bold.red + " ]"
+            "#{repo[:plugin_name]}".bold_red + " from " + "#{repo[:repo_site]}".underscore_blue +
+            " " + "." * padding_length
+          puts " [ " + "FAILED".bold_red + " ]"
 
           @download_failed_count += 1
         end
@@ -141,10 +163,11 @@ class Vum
     end
   end
 
-  def plugin_directory_exists?(repo)
+  def plugin_directory_exists?(repo, index)
     dir = repo[:repo_site].match(/.*\/(\S*)/)[1].to_s.strip.gsub(/\.git/, "")
     if Dir.exists?(dir)
-      puts "  Skip downloading #{repo[:plugin_name]} (already exists)...\n".bold.blue
+      puts "  (#{index + 1}/#{@ok_repolist.length}) " +
+        "Skip downloading #{repo[:plugin_name]} (already exists)...".bold_blue
       @skipped_plugin_count += 1
       return true
     end
@@ -169,9 +192,9 @@ class Vum
         if (index + 1) % 2 != 0
           padding_length = max_length_plugin_name[:plugin_name].length - plugin[:plugin_name].length + 6 -
             (index + 1).to_s.length
-          print "  #{index + 1}".bold.yellow + ". #{plugin[:plugin_name]}" + " " * padding_length
+          print "  #{index + 1}".bold_yellow + ". #{plugin[:plugin_name]}" + " " * padding_length
         else
-          puts "  #{index + 1}".bold.yellow + ". #{plugin[:plugin_name]}"
+          puts "  #{index + 1}".bold_yellow + ". #{plugin[:plugin_name]}"
         end
       end
 
@@ -179,7 +202,7 @@ class Vum
       puts "  There are no updatable plugins in the bundle directory"
     end
 
-    puts "\n  " + "A".bold.yellow + ". All" if @existing_plugins.count > 1
+    puts "\n  " + "A".bold_yellow + ". All" if @existing_plugins.count > 1
   end
 
   def get_plugin_name(line)
@@ -222,15 +245,15 @@ class Vum
     puts "  VUM (Vim bUndle Manager)"
     puts "  ========================"
     puts
-    puts "  " + "#{VUM_MAIN_MENU_CHANGE_PLUGIN_INSTALL_DIR}".bold.yellow +
+    puts "  " + "#{VUM_MAIN_MENU_CHANGE_PLUGIN_INSTALL_DIR}".bold_yellow +
       ". Change plugins directory [ default: #{File.expand_path(@@plugins_dir)} ]"
-    puts "  " + "#{VUM_MAIN_MENU_INSTALL_WITHOUT_CHECK}".bold.yellow +
+    puts "  " + "#{VUM_MAIN_MENU_INSTALL_WITHOUT_CHECK}".bold_yellow +
       ". Install plugins (without checking for repositories)"
-    puts "  " + "#{VUM_MAIN_MENU_INSTALL_WITH_CHECK}".bold.yellow +
+    puts "  " + "#{VUM_MAIN_MENU_INSTALL_WITH_CHECK}".bold_yellow +
       ". Install plugins after repository check"
-    puts "  " + "#{VUM_MAIN_MENU_CHECK}".bold.yellow + ". Check for repositories"
-    puts "  " + "#{VUM_MAIN_MENU_UPDATE}".bold.yellow + ". Update plugins"
-    puts "  " + "Q".bold.yellow + ". Quit"
+    puts "  " + "#{VUM_MAIN_MENU_CHECK}".bold_yellow + ". Check for repositories"
+    puts "  " + "#{VUM_MAIN_MENU_UPDATE}".bold_yellow + ". Update plugins"
+    puts "  " + "Q".bold_yellow + ". Quit"
     puts
     show_prompt
   end
@@ -246,17 +269,17 @@ end
 def update_plugin(plugin)
   dir, repo, p_n = plugin[:dir], plugin[:repo_site], plugin[:plugin_name]
   Dir.chdir(dir)
-  puts "  Updating vim plugin #{p_n} from #{repo}..."
+  puts "  Updating vim plugin #{p_n} from " + "#{repo}".underscore_blue + "..."
   res_out = `git pull`
 
   if $?.exitstatus == 0
     if res_out.include?("up-to-date")
-      puts "    #{p_n} is up-to-date".white.bold
+      puts "    #{p_n} is up-to-date".bold_blue
     else
-      puts "    #{p_n} updated successfully".bold.green
+      puts "    #{p_n} updated successfully".bold_green
     end
   else
-    puts "    #{p_n} updating failed".bold.red
+    puts "    #{p_n} updating failed".bold_red
   end
 end
 
@@ -324,7 +347,7 @@ begin
     puts "Retrieving existing updatable plugin list..."
     puts
     vum.get_updatable_plugin_list
-    puts "  Q".bold.yellow + ". Quit"
+    puts "  Q".bold_yellow + ". Quit"
     puts
 
     while true
@@ -333,7 +356,6 @@ begin
       break if choice == 'q' or choice == 'quit'
       if choice.to_s == 'a' or choice.to_s == 'all'
         puts "  Updating all the plugins"
-        puts
         # update all the plugins
         vum.existing_plugins.each do |targetted_plugin|
           update_plugin(targetted_plugin)
@@ -341,7 +363,7 @@ begin
         end
         puts
         vum.get_updatable_plugin_list
-        puts "  q".bold.yellow + ". Quit"
+        puts "  q".bold_yellow + ". Quit"
         puts
       elsif choice.to_i > 0 and choice.to_i < ((vum.existing_plugins.count) + 1)
         # update a specific plugin
@@ -351,7 +373,7 @@ begin
         # show the updatable plugin list
         puts
         vum.get_updatable_plugin_list
-        puts "  q".bold.yellow + ". Quit"
+        puts "  q".bold_yellow + ". Quit"
         puts
       else
         puts "  Wrong choice..."
