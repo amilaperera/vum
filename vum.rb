@@ -28,6 +28,7 @@ class String
   def underscore_blue; underscore_color(34); end
 end
 
+# main Vum class
 class Vum
   attr_reader :repolist, :ok_repolist, :failed_repolist, :download_ok_count, :download_failed_count,
     :skipped_plugin_count
@@ -120,11 +121,11 @@ class Vum
       `git ls-remote #{repo[:repo_site]} 2>/dev/null 1>&2`
       if $?.exitstatus == 0
         @ok_repolist << repo
-        puts "  #{repo[:plugin_name]}".bold_green + "(" + "#{repo[:repo_site]}".underscore_blue + ") " +
+        puts "  #{repo[:plugin_name]}".bold_green + " (" + "#{repo[:repo_site]}".underscore_blue + ") " +
           ("." * padding_length) + " [   "+ "OK".bold_green + "   ]"
       else
         @failed_repolist << repo
-        puts "  #{repo[:plugin_name]}".bold_red + "(" + "#{repo[:repo_site]}".underscore_blue + ") " +
+        puts "  #{repo[:plugin_name]}".bold_red + " (" + "#{repo[:repo_site]}".underscore_blue + ") " +
           ("." * padding_length) + " [ "+ "FAILED".bold_red + " ]"
       end
     end
@@ -244,7 +245,6 @@ class Vum
     puts
     puts "  VUM (Vim bUndle Manager)"
     puts "  ========================"
-    puts
     puts "  " + "#{VUM_MAIN_MENU_CHANGE_PLUGIN_INSTALL_DIR}".bold_yellow +
       ". Change plugins directory [ default: #{File.expand_path(@@plugins_dir)} ]"
     puts "  " + "#{VUM_MAIN_MENU_INSTALL_WITHOUT_CHECK}".bold_yellow +
